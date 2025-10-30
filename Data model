@@ -1,0 +1,582 @@
+# YOU-N-I-VERSE Profile Output Schema
+# Complete data model for Mind/Heart/Body/Resonance system
+
+"""
+PROFILE ARCHITECTURE
+Four dynamic panels with symbolic ↔ logical toggle modes
+Integrates Human Design + Gene Keys + I Ching + Electron Logic
+"""
+
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any
+from enum import Enum
+import datetime
+
+# ===== CORE ENUMS =====
+
+class ViewMode(Enum):
+    """Display mode toggle"""
+    SYMBOLIC = "symbolic"      # Sacred geometry, mystical view
+    LOGICAL = "logical"        # Data network, electron flow
+    HYBRID = "hybrid"          # Both overlaid
+
+class CenterType(Enum):
+    """9 Human Design Centers"""
+    HEAD = "head"
+    AJNA = "ajna"
+    THROAT = "throat"
+    G_CENTER = "g_center"
+    HEART = "heart"
+    SOLAR_PLEXUS = "solar_plexus"
+    SACRAL = "sacral"
+    SPLEEN = "spleen"
+    ROOT = "root"
+
+class CenterState(Enum):
+    """Center definition states"""
+    DEFINED = "defined"
+    UNDEFINED = "undefined"
+    OPEN = "open"
+    ACTIVE = "active"
+
+class ChannelType(Enum):
+    """Channel circuit types"""
+    INDIVIDUAL = "individual"
+    TRIBAL = "tribal"
+    COLLECTIVE = "collective"
+
+class GateState(Enum):
+    """Gate activation states"""
+    CONSCIOUS = "conscious"      # Personality side (sun)
+    UNCONSCIOUS = "unconscious"  # Design side (earth)
+    BOTH = "both"
+    TRANSIT = "transit"
+
+# ===== FOUNDATIONAL DATA STRUCTURES =====
+
+@dataclass
+class Gate:
+    """Individual gate with all layers of meaning"""
+    number: int  # 1-64
+    name: str
+    i_ching_name: str
+    hexagram_binary: str  # e.g., "111111" for gate 1
+    
+    # Meanings
+    keynote: str
+    shadow: str          # Gene Key shadow frequency
+    gift: str            # Gene Key gift frequency
+    siddhi: str          # Gene Key siddhi frequency
+    
+    # Activation
+    state: GateState
+    line: Optional[int] = None  # 1-6 if defined
+    color: Optional[int] = None  # 1-6 if defined
+    tone: Optional[int] = None   # 1-6 if defined
+    base: Optional[int] = None   # 1-5 if defined
+    
+    # Biological connection
+    codon: Optional[str] = None  # RNA codon
+    amino_acid: Optional[str] = None
+    
+    # Meta
+    center: CenterType
+    circuit: Optional[ChannelType] = None
+
+@dataclass
+class Channel:
+    """Connection between two gates"""
+    gate_1: int
+    gate_2: int
+    name: str
+    circuit_type: ChannelType
+    is_defined: bool
+    keynote: str
+    centers_connected: List[CenterType]
+
+@dataclass
+class Center:
+    """One of the 9 bodygraph centers"""
+    type: CenterType
+    state: CenterState
+    defined_gates: List[int]
+    open_gates: List[int]
+    
+    # Meanings
+    function: str
+    when_defined: str
+    when_undefined: str
+    when_open: str
+    
+    # Biological/energetic
+    bio_resonance: Optional[float] = None  # 0-1 scale
+    electron_flow_pattern: Optional[str] = None  # For logical mode
+
+@dataclass
+class IChingHexagram:
+    """I Ching hexagram data"""
+    number: int  # 1-64
+    name: str
+    chinese_name: str
+    binary: str  # 6-digit binary
+    trigrams: Dict[str, str]  # upper/lower
+    judgment: str
+    image: str
+    lines: List[str]  # 6 line interpretations
+
+# ===== CHART STRUCTURES =====
+
+@dataclass
+class MindChart:
+    """🧠 Mind Chart - Mental processing structure"""
+    chart_type: str = "mind"
+    
+    # Centers involved
+    head_center: Center = None
+    ajna_center: Center = None
+    
+    # Gates in mental centers
+    active_gates: List[Gate] = field(default_factory=list)
+    
+    # Mental circuitry
+    thought_themes: List[str] = field(default_factory=list)
+    processing_type: str = ""  # "Logic", "Abstract", "Hybrid"
+    mental_channels: List[Channel] = field(default_factory=list)
+    
+    # Gene Key mental profile
+    mind_keys: List[int] = field(default_factory=list)  # Key gate numbers
+    
+    # Electron logic data (for logical view)
+    thought_currents: Dict[str, Any] = field(default_factory=dict)
+    neural_pattern: Optional[str] = None
+    
+    # I Ching mental hexagrams
+    hexagrams: List[IChingHexagram] = field(default_factory=list)
+    
+    def get_dominant_thought_pattern(self) -> str:
+        """Return primary mental processing pattern"""
+        if self.head_center and self.head_center.state == CenterState.DEFINED:
+            if self.ajna_center and self.ajna_center.state == CenterState.DEFINED:
+                return "Fixed Mental Authority"
+            return "Pressured Inspiration"
+        elif self.ajna_center and self.ajna_center.state == CenterState.DEFINED:
+            return "Fixed Processing"
+        return "Fluid Awareness"
+
+@dataclass
+class HeartChart:
+    """💓 Heart Chart - Values, will, identity"""
+    chart_type: str = "heart"
+    
+    # Centers involved
+    g_center: Center = None
+    heart_center: Center = None
+    
+    # Gates in identity/will centers
+    active_gates: List[Gate] = field(default_factory=list)
+    
+    # Heart pathways
+    value_themes: List[str] = field(default_factory=list)
+    direction_type: str = ""  # "Fixed", "Fluid", "Projected"
+    will_pattern: str = ""    # "Consistent", "Variable", "Rest-focused"
+    
+    # Gene Key heart profile
+    heart_keys: List[int] = field(default_factory=list)
+    
+    # Identity evolution
+    life_direction: Optional[str] = None
+    incarnation_cross: Optional[str] = None
+    
+    # Electron logic (for logical view)
+    identity_pulse: Dict[str, Any] = field(default_factory=dict)
+    will_force_vector: Optional[str] = None
+    
+    # I Ching heart hexagrams
+    hexagrams: List[IChingHexagram] = field(default_factory=list)
+    
+    def get_identity_core(self) -> str:
+        """Return core identity pattern"""
+        if self.g_center and self.g_center.state == CenterState.DEFINED:
+            return "Fixed Identity - Self-Directed"
+        return "Fluid Identity - Direction from Others"
+
+@dataclass
+class BodyChart:
+    """🌿 Body Chart - Full bodygraph with biological resonance"""
+    chart_type: str = "body"
+    
+    # All 9 centers
+    centers: Dict[CenterType, Center] = field(default_factory=dict)
+    
+    # All gates and channels
+    all_gates: List[Gate] = field(default_factory=list)
+    all_channels: List[Channel] = field(default_factory=list)
+    
+    # Type & Strategy
+    hd_type: str = ""  # Generator, Projector, Manifestor, Reflector
+    strategy: str = ""
+    authority: str = ""
+    profile: str = ""  # e.g., "6/2"
+    
+    # Biological synchrony
+    bio_sync_patterns: Dict[str, float] = field(default_factory=dict)
+    health_resonance: Optional[float] = None
+    
+    # Electron logic (biological patterns)
+    bio_currents: Dict[str, Any] = field(default_factory=dict)
+    energy_flow_map: Optional[str] = None
+    
+    # Environmental data
+    environment_type: Optional[str] = None
+    perspective: Optional[str] = None
+    
+    # I Ching body hexagrams
+    hexagrams: List[IChingHexagram] = field(default_factory=list)
+    
+    def get_energy_type(self) -> str:
+        """Return primary energy configuration"""
+        if self.hd_type:
+            return f"{self.hd_type} - {self.strategy}"
+        return "Unknown Type"
+    
+    def calculate_definition_percentage(self) -> float:
+        """Calculate what % of centers are defined"""
+        if not self.centers:
+            return 0.0
+        defined = sum(1 for c in self.centers.values() 
+                     if c.state == CenterState.DEFINED)
+        return (defined / len(self.centers)) * 100
+
+@dataclass
+class ResonanceSentence:
+    """🌌 Individual resonance sentence with metadata"""
+    text: str
+    timestamp: datetime.datetime
+    
+    # Source data
+    source_type: str  # "journal", "chat", "voice", "auto"
+    trigger_gate: Optional[int] = None
+    trigger_key: Optional[int] = None
+    
+    # Metrics
+    frequency: float = 0.0  # Calculated resonance frequency
+    coherence: float = 0.0  # 1-15 scale
+    emotion_signature: Optional[str] = None
+    
+    # Electron logic
+    wave_pattern: Optional[str] = None
+    interference_type: Optional[str] = None
+
+@dataclass
+class ResonancePanel:
+    """🌌 Resonance Sentences - Live language frequency tracking"""
+    panel_type: str = "resonance"
+    
+    # Current active sentences
+    current_sentences: List[ResonanceSentence] = field(default_factory=list)
+    
+    # Historical tracking
+    sentence_history: List[ResonanceSentence] = field(default_factory=list)
+    
+    # Pattern analysis
+    dominant_gates: List[int] = field(default_factory=list)
+    dominant_themes: List[str] = field(default_factory=list)
+    frequency_evolution: List[Dict[str, Any]] = field(default_factory=list)
+    
+    # Real-time data
+    current_frequency: Optional[float] = None
+    current_coherence: Optional[float] = None
+    
+    def add_sentence(self, sentence: ResonanceSentence):
+        """Add new resonance sentence"""
+        self.current_sentences.append(sentence)
+        self.sentence_history.append(sentence)
+        
+        # Keep only last 10 in current view
+        if len(self.current_sentences) > 10:
+            self.current_sentences = self.current_sentences[-10:]
+    
+    def get_latest_frequency_snapshot(self) -> str:
+        """Get most recent frequency state"""
+        if self.current_sentences:
+            latest = self.current_sentences[-1]
+            return f"Resonating at {latest.frequency:.2f}Hz in Gate {latest.trigger_gate}"
+        return "Awaiting input..."
+
+# ===== COMPLETE PROFILE STRUCTURE =====
+
+@dataclass
+class UniverseProfile:
+    """
+    🌌 YOU-N-I-VERSE Complete Profile
+    Four-panel system with symbolic ↔ logical modes
+    """
+    
+    # Identity
+    user_id: str
+    birth_data: Dict[str, Any]
+    created_at: datetime.datetime
+    last_updated: datetime.datetime
+    
+    # Four primary charts
+    mind_chart: MindChart
+    heart_chart: HeartChart
+    body_chart: BodyChart
+    resonance_panel: ResonancePanel
+    
+    # Global settings
+    view_mode: ViewMode = ViewMode.SYMBOLIC
+    
+    # Meta analysis
+    consciousness_level: float = 1.0
+    evolution_stage: str = "Awakening"
+    quantum_signature: Optional[str] = None
+    
+    def toggle_view_mode(self):
+        """Toggle between symbolic and logical views"""
+        if self.view_mode == ViewMode.SYMBOLIC:
+            self.view_mode = ViewMode.LOGICAL
+        elif self.view_mode == ViewMode.LOGICAL:
+            self.view_mode = ViewMode.HYBRID
+        else:
+            self.view_mode = ViewMode.SYMBOLIC
+    
+    def get_full_profile_summary(self) -> Dict[str, Any]:
+        """Generate complete profile summary"""
+        return {
+            "user_id": self.user_id,
+            "view_mode": self.view_mode.value,
+            "consciousness_level": self.consciousness_level,
+            "evolution_stage": self.evolution_stage,
+            "mind": {
+                "thought_pattern": self.mind_chart.get_dominant_thought_pattern(),
+                "active_gates": len(self.mind_chart.active_gates),
+                "mental_channels": len(self.mind_chart.mental_channels)
+            },
+            "heart": {
+                "identity_core": self.heart_chart.get_identity_core(),
+                "life_direction": self.heart_chart.life_direction,
+                "will_pattern": self.heart_chart.will_pattern
+            },
+            "body": {
+                "type": self.body_chart.hd_type,
+                "strategy": self.body_chart.strategy,
+                "authority": self.body_chart.authority,
+                "profile": self.body_chart.profile,
+                "definition": f"{self.body_chart.calculate_definition_percentage():.1f}%"
+            },
+            "resonance": {
+                "current_frequency": self.resonance_panel.current_frequency,
+                "current_coherence": self.resonance_panel.current_coherence,
+                "active_sentences": len(self.resonance_panel.current_sentences),
+                "latest": self.resonance_panel.get_latest_frequency_snapshot()
+            },
+            "quantum_signature": self.quantum_signature
+        }
+    
+    def export_for_visualization(self) -> Dict[str, Any]:
+        """Export data structure optimized for D3.js/React visualization"""
+        return {
+            "metadata": {
+                "user_id": self.user_id,
+                "view_mode": self.view_mode.value,
+                "timestamp": self.last_updated.isoformat()
+            },
+            "mind": {
+                "centers": [
+                    {
+                        "type": self.mind_chart.head_center.type.value if self.mind_chart.head_center else None,
+                        "state": self.mind_chart.head_center.state.value if self.mind_chart.head_center else None,
+                    },
+                    {
+                        "type": self.mind_chart.ajna_center.type.value if self.mind_chart.ajna_center else None,
+                        "state": self.mind_chart.ajna_center.state.value if self.mind_chart.ajna_center else None,
+                    }
+                ],
+                "gates": [
+                    {
+                        "number": g.number,
+                        "name": g.name,
+                        "state": g.state.value,
+                        "line": g.line
+                    } for g in self.mind_chart.active_gates
+                ],
+                "patterns": {
+                    "dominant": self.mind_chart.get_dominant_thought_pattern(),
+                    "themes": self.mind_chart.thought_themes
+                }
+            },
+            "heart": {
+                "centers": [
+                    {
+                        "type": self.heart_chart.g_center.type.value if self.heart_chart.g_center else None,
+                        "state": self.heart_chart.g_center.state.value if self.heart_chart.g_center else None,
+                    },
+                    {
+                        "type": self.heart_chart.heart_center.type.value if self.heart_chart.heart_center else None,
+                        "state": self.heart_chart.heart_center.state.value if self.heart_chart.heart_center else None,
+                    }
+                ],
+                "gates": [
+                    {
+                        "number": g.number,
+                        "name": g.name,
+                        "state": g.state.value
+                    } for g in self.heart_chart.active_gates
+                ],
+                "identity": self.heart_chart.get_identity_core()
+            },
+            "body": {
+                "centers": [
+                    {
+                        "type": c.type.value,
+                        "state": c.state.value,
+                        "gates": c.defined_gates,
+                        "bio_resonance": c.bio_resonance
+                    } for c in self.body_chart.centers.values()
+                ],
+                "channels": [
+                    {
+                        "gates": [ch.gate_1, ch.gate_2],
+                        "name": ch.name,
+                        "defined": ch.is_defined,
+                        "circuit": ch.circuit_type.value
+                    } for ch in self.body_chart.all_channels
+                ],
+                "type": self.body_chart.hd_type,
+                "strategy": self.body_chart.strategy,
+                "authority": self.body_chart.authority
+            },
+            "resonance": {
+                "sentences": [
+                    {
+                        "text": s.text,
+                        "timestamp": s.timestamp.isoformat(),
+                        "frequency": s.frequency,
+                        "gate": s.trigger_gate,
+                        "coherence": s.coherence
+                    } for s in self.resonance_panel.current_sentences
+                ],
+                "current_state": {
+                    "frequency": self.resonance_panel.current_frequency,
+                    "coherence": self.resonance_panel.current_coherence
+                }
+            }
+        }
+
+# ===== PROFILE GENERATOR ENGINE =====
+
+class ProfileGenerator:
+    """
+    Generates complete YOU-N-I-VERSE profiles from birth data
+    Integrates Human Design + Gene Keys + I Ching
+    """
+    
+    def __init__(self):
+        self.gate_database = self._load_gate_database()
+        self.channel_database = self._load_channel_database()
+        self.iching_database = self._load_iching_database()
+    
+    def generate_profile(self, user_id: str, birth_data: Dict[str, Any]) -> UniverseProfile:
+        """Generate complete profile from birth data"""
+        
+        # Calculate bodygraph (would use actual HD calculation engine)
+        body_chart = self._generate_body_chart(birth_data)
+        
+        # Extract mind chart from body data
+        mind_chart = self._extract_mind_chart(body_chart)
+        
+        # Extract heart chart from body data
+        heart_chart = self._extract_heart_chart(body_chart)
+        
+        # Initialize resonance panel
+        resonance_panel = ResonancePanel()
+        
+        # Create profile
+        profile = UniverseProfile(
+            user_id=user_id,
+            birth_data=birth_data,
+            created_at=datetime.datetime.now(),
+            last_updated=datetime.datetime.now(),
+            mind_chart=mind_chart,
+            heart_chart=heart_chart,
+            body_chart=body_chart,
+            resonance_panel=resonance_panel
+        )
+        
+        # Generate quantum signature
+        profile.quantum_signature = self._generate_quantum_signature(profile)
+        
+        return profile
+    
+    def _load_gate_database(self) -> Dict[int, Dict]:
+        """Load complete gate database with all meanings"""
+        # This would load from comprehensive database
+        # Placeholder with a few examples
+        return {
+            1: {
+                "name": "Creative Power",
+                "i_ching": "The Creative",
+                "keynote": "Self-Expression",
+                "shadow": "Entropy",
+                "gift": "Freshness",
+                "siddhi": "Beauty",
+                "center": CenterType.G_CENTER
+            },
+            # ... would continue for all 64 gates
+        }
+    
+    def _load_channel_database(self) -> List[Dict]:
+        """Load all Human Design channels"""
+        return []  # Would load complete channel definitions
+    
+    def _load_iching_database(self) -> Dict[int, IChingHexagram]:
+        """Load I Ching hexagram database"""
+        return {}  # Would load complete I Ching texts
+    
+    def _generate_body_chart(self, birth_data: Dict) -> BodyChart:
+        """Generate complete bodygraph"""
+        # This would use actual HD calculation
+        # Placeholder mock
+        return BodyChart(
+            hd_type="Generator",
+            strategy="To Respond",
+            authority="Sacral",
+            profile="5/1"
+        )
+    
+    def _extract_mind_chart(self, body_chart: BodyChart) -> MindChart:
+        """Extract mind-specific data from body chart"""
+        mind_chart = MindChart()
+        
+        # Would extract head and ajna centers
+        # Add mental gates and channels
+        # Calculate thought patterns
+        
+        return mind_chart
+    
+    def _extract_heart_chart(self, body_chart: BodyChart) -> HeartChart:
+        """Extract heart-specific data from body chart"""
+        heart_chart = HeartChart()
+        
+        # Would extract G and Heart centers
+        # Add identity and will gates
+        # Calculate direction patterns
+        
+        return heart_chart
+    
+    def _generate_quantum_signature(self, profile: UniverseProfile) -> str:
+        """Generate unique quantum signature for profile"""
+        # Combine all gate numbers and states
+        gate_sum = sum(g.number for g in profile.body_chart.all_gates)
+        return f"Ψ{gate_sum}:{profile.consciousness_level:.2f}"
+
+# ===== EXAMPLE USAGE =====
+
+def demo_profile_system():
+    """Demonstrate the profile system"""
+    print("=" * 70)
+    print("🌌 YOU-N-I-VERSE PROFILE SYSTEM - SCHEMA DEMONSTRATION")
+    print("=" * 70)
+    
+    # Crea
