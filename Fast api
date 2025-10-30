@@ -1,0 +1,688 @@
+# YOU-N-I-VERSE FastAPI Backend
+# Complete REST API for consciousness profile system
+
+"""
+FASTAPI BACKEND
+Serves profile generation, resonance tracking, and real-time updates
+Auto-generates interactive docs at /docs
+"""
+
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from typing import Dict, List, Optional, Any
+from datetime import datetime
+from enum import Enum
+import json
+import asyncio
+from uuid import uuid4
+
+# ===== PYDANTIC MODELS (Request/Response) =====
+
+class ViewModeEnum(str, Enum):
+    symbolic = "symbolic"
+    logical = "logical"
+    hybrid = "hybrid"
+
+class BirthDataInput(BaseModel):
+    """Birth data for profile generation"""
+    date: str = Field(..., description="Birth date (YYYY-MM-DD)")
+    time: str = Field(..., description="Birth time (HH:MM)")
+    location: str = Field(..., description="Birth location name")
+    latitude: float = Field(..., ge=-90, le=90, description="Latitude")
+    longitude: float = Field(..., ge=-180, le=180, description="Longitude")
+    timezone: str = Field(default="UTC", description="Timezone (e.g., 'America/Los_Angeles')")
+
+class ProfileGenerationRequest(BaseModel):
+    """Request to generate new profile"""
+    user_id: Optional[str] = Field(None, description="Optional user ID (auto-generated if not provided)")
+    birth_data: BirthDataInput
+    include_transits: bool = Field(default=False, description="Include current transits")
+    view_mode: ViewModeEnum = Field(default=ViewModeEnum.symbolic)
+
+class ResonanceSentenceInput(BaseModel):
+    """Input for adding resonance sentence"""
+    user_id: str
+    text: str = Field(..., min_length=10, max_length=500)
+    source_type: str = Field(default="manual", description="journal, chat, voice, auto")
+
+class ProfileUpdateRequest(BaseModel):
+    """Request to update profile settings"""
+    view_mode: Optional[ViewModeEnum] = None
+    consciousness_level: Optional[float] = Field(None, ge=0, le=100)
+
+class GateResponse(BaseModel):
+    """Gate information response"""
+    number: int
+    name: str
+    i_ching_name: str
+    keynote: str
+    shadow: str
+    gift: str
+    siddhi: str
+    center: str
+    state: str
+    line: Optional[int] = None
+
+class CenterResponse(BaseModel):
+    """Center information response"""
+    type: str
+    state: str
+    defined_gates: List[int]
+    open_gates: List[int]
+    function: str
+    bio_resonance: Optional[float] = None
+
+class MindChartResponse(BaseModel):
+    """Mind chart response"""
+    thought_pattern: str
+    active_gates: List[GateResponse]
+    mental_channels: int
+    thought_themes: List[str]
+    neural_pattern: Optional[str] = None
+
+class HeartChartResponse(BaseModel):
+    """Heart chart response"""
+    identity_core: str
+    active_gates: List[GateResponse]
+    life_direction: Optional[str] = None
+    will_pattern: str
+    incarnation_cross: Optional[str] = None
+
+class BodyChartResponse(BaseModel):
+    """Body chart response"""
+    centers: List[CenterResponse]
+    hd_type: str
+    strategy: str
+    authority: str
+    profile: str
+    definition_percentage: float
+    all_gates: List[GateResponse]
+
+class ResonanceSentenceResponse(BaseModel):
+    """Resonance sentence response"""
+    text: str
+    timestamp: str
+    frequency: float
+    coherence: float
+    trigger_gate: Optional[int] = None
+    emotion_signature: Optional[str] = None
+
+class ResonancePanelResponse(BaseModel):
+    """Resonance panel response"""
+    current_sentences: List[ResonanceSentenceResponse]
+    current_frequency: Optional[float] = None
+    current_coherence: Optional[float] = None
+    dominant_gates: List[int]
+    latest_snapshot: str
+
+class ProfileResponse(BaseModel):
+    """Complete profile response"""
+    user_id: str
+    birth_data: Dict[str, Any]
+    created_at: str
+    last_updated: str
+    view_mode: str
+    consciousness_level: float
+    evolution_stage: str
+    quantum_signature: str
+    mind_chart: MindChartResponse
+    heart_chart: HeartChartResponse
+    body_chart: BodyChartResponse
+    resonance_panel: ResonancePanelResponse
+
+class ProfileSummaryResponse(BaseModel):
+    """Condensed profile summary"""
+    user_id: str
+    view_mode: str
+    consciousness_level: float
+    evolution_stage: str
+    mind_summary: Dict[str, Any]
+    heart_summary: Dict[str, Any]
+    body_summary: Dict[str, Any]
+    resonance_summary: Dict[str, Any]
+    quantum_signature: str
+
+# ===== IN-MEMORY STORAGE (Replace with database in production) =====
+
+class ProfileStore:
+    """In-memory profile storage"""
+    def __init__(self):
+        self.profiles: Dict[str, Dict] = {}
+        self.resonance_history: Dict[str, List[Dict]] = {}
+    
+    def save_profile(self, user_id: str, profile_data: Dict):
+        """Save profile to store"""
+        self.profiles[user_id] = profile_data
+        if user_id not in self.resonance_history:
+            self.resonance_history[user_id] = []
+    
+    def get_profile(self, user_id: str) -> Optional[Dict]:
+        """Retrieve profile from store"""
+        return self.profiles.get(user_id)
+    
+    def update_profile(self, user_id: str, updates: Dict):
+        """Update profile data"""
+        if user_id in self.profiles:
+            self.profiles[user_id].update(updates)
+            self.profiles[user_id]["last_updated"] = datetime.now().isoformat()
+    
+    def add_resonance_sentence(self, user_id: str, sentence: Dict):
+        """Add resonance sentence to history"""
+        if user_id not in self.resonance_history:
+            self.resonance_history[user_id] = []
+        self.resonance_history[user_id].append(sentence)
+    
+    def get_resonance_history(self, user_id: str, limit: int = 50) -> List[Dict]:
+        """Get resonance sentence history"""
+        history = self.resonance_history.get(user_id, [])
+        return history[-limit:]
+    
+    def list_all_profiles(self) -> List[str]:
+        """List all profile user IDs"""
+        return list(self.profiles.keys())
+
+# ===== PROFILE GENERATION ENGINE =====
+
+class ProfileEngine:
+    """Engine for generating profiles from birth data"""
+    
+    @staticmethod
+    def generate_mock_profile(user_id: str, birth_data: Dict) -> Dict:
+        """Generate mock profile (replace with actual calculation)"""
+        
+        # Mock gate data
+        mock_gates = [
+            {
+                "number": 1, "name": "Creative Power", "i_ching_name": "The Creative",
+                "keynote": "Self-Expression", "shadow": "Entropy", "gift": "Freshness",
+                "siddhi": "Beauty", "center": "g_center", "state": "conscious", "line": 3
+            },
+            {
+                "number": 13, "name": "The Listener", "i_ching_name": "Fellowship",
+                "keynote": "Direction", "shadow": "Discord", "gift": "Discernment",
+                "siddhi": "Empathy", "center": "g_center", "state": "unconscious", "line": 1
+            },
+            {
+                "number": 43, "name": "Insight", "i_ching_name": "Breakthrough",
+                "keynote": "Individuality", "shadow": "Deafness", "gift": "Insight",
+                "siddhi": "Epiphany", "center": "ajna", "state": "conscious", "line": 4
+            }
+        ]
+        
+        # Mock centers
+        mock_centers = [
+            {
+                "type": "head", "state": "undefined", "defined_gates": [],
+                "open_gates": [64, 61, 63], "function": "Inspiration & Mental Pressure",
+                "bio_resonance": 0.3
+            },
+            {
+                "type": "ajna", "state": "defined", "defined_gates": [43, 4],
+                "open_gates": [], "function": "Mental Awareness & Processing",
+                "bio_resonance": 0.85
+            },
+            {
+                "type": "g_center", "state": "defined", "defined_gates": [1, 13, 7],
+                "open_gates": [], "function": "Identity & Direction",
+                "bio_resonance": 0.92
+            },
+            {
+                "type": "sacral", "state": "defined", "defined_gates": [5, 14, 29, 59],
+                "open_gates": [], "function": "Life Force & Response",
+                "bio_resonance": 0.88
+            }
+        ]
+        
+        profile_data = {
+            "user_id": user_id,
+            "birth_data": birth_data,
+            "created_at": datetime.now().isoformat(),
+            "last_updated": datetime.now().isoformat(),
+            "view_mode": "symbolic",
+            "consciousness_level": 5.0,
+            "evolution_stage": "Awakening",
+            "quantum_signature": f"Ψ{sum(g['number'] for g in mock_gates)}:5.0",
+            
+            "mind_chart": {
+                "thought_pattern": "Fixed Mental Authority",
+                "active_gates": [g for g in mock_gates if g["center"] in ["head", "ajna"]],
+                "mental_channels": 2,
+                "thought_themes": ["Insight", "Breakthrough", "Individual Knowing"],
+                "neural_pattern": "spiral_convergence"
+            },
+            
+            "heart_chart": {
+                "identity_core": "Fixed Identity - Self-Directed",
+                "active_gates": [g for g in mock_gates if g["center"] == "g_center"],
+                "life_direction": "Creative Leadership",
+                "will_pattern": "Variable Will",
+                "incarnation_cross": "Right Angle Cross of Consciousness"
+            },
+            
+            "body_chart": {
+                "centers": mock_centers,
+                "hd_type": "Generator",
+                "strategy": "To Respond",
+                "authority": "Sacral Authority",
+                "profile": "5/1",
+                "definition_percentage": 55.6,
+                "all_gates": mock_gates
+            },
+            
+            "resonance_panel": {
+                "current_sentences": [],
+                "current_frequency": 432.0,
+                "current_coherence": 7.8,
+                "dominant_gates": [1, 13, 43],
+                "latest_snapshot": "Resonating at 432Hz in Gate 1"
+            }
+        }
+        
+        return profile_data
+    
+    @staticmethod
+    def calculate_resonance_metrics(text: str, user_profile: Dict) -> Dict:
+        """Calculate resonance metrics for input text"""
+        # Simple mock calculation (replace with actual NLP/frequency analysis)
+        word_count = len(text.split())
+        
+        # Mock frequency calculation (would use actual linguistic analysis)
+        base_frequency = 400 + (word_count * 5) % 200
+        
+        # Mock coherence (would use actual field coherence calculation)
+        coherence = min(1 + (word_count / 10), 15)
+        
+        # Mock gate triggering (would use actual keyword matching)
+        trigger_gate = (len(text) % 64) + 1
+        
+        # Mock emotion detection
+        emotions = ["joy", "clarity", "uncertainty", "peace", "excitement"]
+        emotion_signature = emotions[len(text) % len(emotions)]
+        
+        return {
+            "frequency": round(base_frequency, 2),
+            "coherence": round(coherence, 2),
+            "trigger_gate": trigger_gate,
+            "emotion_signature": emotion_signature,
+            "wave_pattern": "harmonic_oscillation"
+        }
+
+# ===== WEBSOCKET CONNECTION MANAGER =====
+
+class ConnectionManager:
+    """Manage WebSocket connections for real-time updates"""
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+    
+    async def connect(self, user_id: str, websocket: WebSocket):
+        await websocket.accept()
+        if user_id not in self.active_connections:
+            self.active_connections[user_id] = []
+        self.active_connections[user_id].append(websocket)
+    
+    def disconnect(self, user_id: str, websocket: WebSocket):
+        if user_id in self.active_connections:
+            self.active_connections[user_id].remove(websocket)
+            if not self.active_connections[user_id]:
+                del self.active_connections[user_id]
+    
+    async def send_personal_message(self, message: str, user_id: str):
+        if user_id in self.active_connections:
+            for connection in self.active_connections[user_id]:
+                await connection.send_text(message)
+    
+    async def broadcast(self, message: str):
+        for connections in self.active_connections.values():
+            for connection in connections:
+                await connection.send_text(message)
+
+# ===== FASTAPI APPLICATION =====
+
+app = FastAPI(
+    title="YOU-N-I-VERSE API",
+    description="Consciousness Operating System - Profile Generation & Resonance Tracking",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# CORS middleware for React frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify actual origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize storage and managers
+profile_store = ProfileStore()
+profile_engine = ProfileEngine()
+connection_manager = ConnectionManager()
+
+# ===== ROOT & HEALTH CHECK =====
+
+@app.get("/", tags=["Root"])
+async def root():
+    """API root endpoint"""
+    return {
+        "message": "🌌 YOU-N-I-VERSE API",
+        "version": "1.0.0",
+        "status": "operational",
+        "docs": "/docs",
+        "endpoints": {
+            "generate_profile": "POST /api/v1/profile/generate",
+            "get_profile": "GET /api/v1/profile/{user_id}",
+            "add_resonance": "POST /api/v1/resonance/add",
+            "websocket": "WS /api/v1/ws/{user_id}"
+        }
+    }
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "profiles_count": len(profile_store.list_all_profiles())
+    }
+
+# ===== PROFILE ENDPOINTS =====
+
+@app.post("/api/v1/profile/generate", response_model=ProfileResponse, tags=["Profile"])
+async def generate_profile(request: ProfileGenerationRequest):
+    """
+    Generate a new consciousness profile from birth data
+    
+    Creates complete Mind/Heart/Body charts with resonance tracking
+    """
+    # Generate user_id if not provided
+    user_id = request.user_id or f"user_{uuid4().hex[:8]}"
+    
+    # Check if profile already exists
+    if profile_store.get_profile(user_id):
+        raise HTTPException(status_code=400, detail=f"Profile already exists for user_id: {user_id}")
+    
+    # Generate profile
+    birth_data_dict = request.birth_data.dict()
+    profile_data = profile_engine.generate_mock_profile(user_id, birth_data_dict)
+    
+    # Update view mode if specified
+    profile_data["view_mode"] = request.view_mode.value
+    
+    # Save to store
+    profile_store.save_profile(user_id, profile_data)
+    
+    return ProfileResponse(**profile_data)
+
+@app.get("/api/v1/profile/{user_id}", response_model=ProfileResponse, tags=["Profile"])
+async def get_profile(user_id: str):
+    """
+    Retrieve complete profile by user_id
+    """
+    profile = profile_store.get_profile(user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"Profile not found for user_id: {user_id}")
+    
+    return ProfileResponse(**profile)
+
+@app.get("/api/v1/profile/{user_id}/summary", response_model=ProfileSummaryResponse, tags=["Profile"])
+async def get_profile_summary(user_id: str):
+    """
+    Get condensed profile summary
+    """
+    profile = profile_store.get_profile(user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"Profile not found for user_id: {user_id}")
+    
+    summary = {
+        "user_id": profile["user_id"],
+        "view_mode": profile["view_mode"],
+        "consciousness_level": profile["consciousness_level"],
+        "evolution_stage": profile["evolution_stage"],
+        "mind_summary": {
+            "thought_pattern": profile["mind_chart"]["thought_pattern"],
+            "active_gates": len(profile["mind_chart"]["active_gates"])
+        },
+        "heart_summary": {
+            "identity_core": profile["heart_chart"]["identity_core"],
+            "life_direction": profile["heart_chart"]["life_direction"]
+        },
+        "body_summary": {
+            "type": profile["body_chart"]["hd_type"],
+            "strategy": profile["body_chart"]["strategy"],
+            "authority": profile["body_chart"]["authority"]
+        },
+        "resonance_summary": {
+            "current_frequency": profile["resonance_panel"]["current_frequency"],
+            "current_coherence": profile["resonance_panel"]["current_coherence"]
+        },
+        "quantum_signature": profile["quantum_signature"]
+    }
+    
+    return ProfileSummaryResponse(**summary)
+
+@app.patch("/api/v1/profile/{user_id}", tags=["Profile"])
+async def update_profile(user_id: str, updates: ProfileUpdateRequest):
+    """
+    Update profile settings
+    """
+    profile = profile_store.get_profile(user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"Profile not found for user_id: {user_id}")
+    
+    update_data = {}
+    if updates.view_mode:
+        update_data["view_mode"] = updates.view_mode.value
+    if updates.consciousness_level is not None:
+        update_data["consciousness_level"] = updates.consciousness_level
+    
+    profile_store.update_profile(user_id, update_data)
+    
+    return {"message": "Profile updated successfully", "updates": update_data}
+
+@app.delete("/api/v1/profile/{user_id}", tags=["Profile"])
+async def delete_profile(user_id: str):
+    """
+    Delete a profile
+    """
+    if user_id not in profile_store.profiles:
+        raise HTTPException(status_code=404, detail=f"Profile not found for user_id: {user_id}")
+    
+    del profile_store.profiles[user_id]
+    if user_id in profile_store.resonance_history:
+        del profile_store.resonance_history[user_id]
+    
+    return {"message": f"Profile {user_id} deleted successfully"}
+
+@app.get("/api/v1/profiles", tags=["Profile"])
+async def list_profiles():
+    """
+    List all profile user_ids
+    """
+    return {
+        "count": len(profile_store.profiles),
+        "profiles": profile_store.list_all_profiles()
+    }
+
+# ===== RESONANCE ENDPOINTS =====
+
+@app.post("/api/v1/resonance/add", tags=["Resonance"])
+async def add_resonance_sentence(input_data: ResonanceSentenceInput):
+    """
+    Add a new resonance sentence and calculate metrics
+    """
+    profile = profile_store.get_profile(input_data.user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"Profile not found for user_id: {input_data.user_id}")
+    
+    # Calculate resonance metrics
+    metrics = profile_engine.calculate_resonance_metrics(input_data.text, profile)
+    
+    # Create sentence record
+    sentence = {
+        "text": input_data.text,
+        "timestamp": datetime.now().isoformat(),
+        "source_type": input_data.source_type,
+        "frequency": metrics["frequency"],
+        "coherence": metrics["coherence"],
+        "trigger_gate": metrics["trigger_gate"],
+        "emotion_signature": metrics["emotion_signature"]
+    }
+    
+    # Add to store
+    profile_store.add_resonance_sentence(input_data.user_id, sentence)
+    
+    # Update profile resonance panel
+    profile["resonance_panel"]["current_sentences"].append(sentence)
+    profile["resonance_panel"]["current_frequency"] = metrics["frequency"]
+    profile["resonance_panel"]["current_coherence"] = metrics["coherence"]
+    
+    # Keep only last 10 sentences in current view
+    if len(profile["resonance_panel"]["current_sentences"]) > 10:
+        profile["resonance_panel"]["current_sentences"] = \
+            profile["resonance_panel"]["current_sentences"][-10:]
+    
+    profile_store.update_profile(input_data.user_id, {
+        "resonance_panel": profile["resonance_panel"]
+    })
+    
+    # Send WebSocket update
+    await connection_manager.send_personal_message(
+        json.dumps({"type": "resonance_update", "data": sentence}),
+        input_data.user_id
+    )
+    
+    return sentence
+
+@app.get("/api/v1/resonance/{user_id}/history", tags=["Resonance"])
+async def get_resonance_history(user_id: str, limit: int = 50):
+    """
+    Get resonance sentence history
+    """
+    if user_id not in profile_store.profiles:
+        raise HTTPException(status_code=404, detail=f"Profile not found for user_id: {user_id}")
+    
+    history = profile_store.get_resonance_history(user_id, limit)
+    
+    return {
+        "user_id": user_id,
+        "count": len(history),
+        "sentences": history
+    }
+
+@app.get("/api/v1/resonance/{user_id}/current", tags=["Resonance"])
+async def get_current_resonance(user_id: str):
+    """
+    Get current resonance state
+    """
+    profile = profile_store.get_profile(user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"Profile not found for user_id: {user_id}")
+    
+    return profile["resonance_panel"]
+
+# ===== GATE & HEXAGRAM ENDPOINTS =====
+
+@app.get("/api/v1/gates/{gate_number}", tags=["Gates"])
+async def get_gate_info(gate_number: int):
+    """
+    Get information about a specific gate
+    """
+    if gate_number < 1 or gate_number > 64:
+        raise HTTPException(status_code=400, detail="Gate number must be between 1 and 64")
+    
+    # Mock gate data (would load from database)
+    gate_data = {
+        "number": gate_number,
+        "name": f"Gate {gate_number}",
+        "i_ching_name": "Hexagram Name",
+        "keynote": "Core Theme",
+        "shadow": "Shadow Frequency",
+        "gift": "Gift Frequency",
+        "siddhi": "Siddhi Frequency",
+        "center": "g_center",
+        "codon": "AUG",
+        "amino_acid": "Methionine"
+    }
+    
+    return gate_data
+
+@app.get("/api/v1/hexagrams/{hexagram_number}", tags=["I Ching"])
+async def get_hexagram_info(hexagram_number: int):
+    """
+    Get I Ching hexagram information
+    """
+    if hexagram_number < 1 or hexagram_number > 64:
+        raise HTTPException(status_code=400, detail="Hexagram number must be between 1 and 64")
+    
+    # Mock hexagram data
+    hexagram_data = {
+        "number": hexagram_number,
+        "name": "Hexagram Name",
+        "chinese_name": "中文名",
+        "judgment": "The judgment text...",
+        "image": "The image text...",
+        "binary": "111111"
+    }
+    
+    return hexagram_data
+
+# ===== WEBSOCKET FOR REAL-TIME UPDATES =====
+
+@app.websocket("/api/v1/ws/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    """
+    WebSocket connection for real-time profile updates
+    """
+    await connection_manager.connect(user_id, websocket)
+    
+    try:
+        while True:
+            # Wait for messages from client
+            data = await websocket.receive_text()
+            
+            # Echo back for now (can add custom handlers)
+            await connection_manager.send_personal_message(
+                json.dumps({"type": "echo", "message": data}),
+                user_id
+            )
+            
+    except WebSocketDisconnect:
+        connection_manager.disconnect(user_id, websocket)
+
+# ===== EXPORT ENDPOINT =====
+
+@app.get("/api/v1/profile/{user_id}/export", tags=["Profile"])
+async def export_profile_for_visualization(user_id: str):
+    """
+    Export profile in format optimized for D3.js/React visualization
+    """
+    profile = profile_store.get_profile(user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"Profile not found for user_id: {user_id}")
+    
+    # Format for visualization
+    export_data = {
+        "metadata": {
+            "user_id": profile["user_id"],
+            "view_mode": profile["view_mode"],
+            "timestamp": profile["last_updated"]
+        },
+        "mind": profile["mind_chart"],
+        "heart": profile["heart_chart"],
+        "body": profile["body_chart"],
+        "resonance": profile["resonance_panel"]
+    }
+    
+    return export_data
+
+# ===== RUN SERVER =====
+
+if __name__ == "__main__":
+    import uvicorn
+    print("🌌 Starting YOU-N-I-VERSE FastAPI Server...")
+    print("📚 API Docs: http://localhost:8000/docs")
+    print("🔄 WebSocket: ws://localhost:8000/api/v1/ws/{user_id}")
+    uvicorn.run(app, host="0.0.0.0", port=8000)
